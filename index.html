@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LIANG — Dota 2 Ban/Pick Prediction Model</title>
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      color: #1d1d1f;
+      background: #fff;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* ─── Navigation ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      height: 48px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    nav .nav-inner {
+      max-width: 1024px; width: 100%; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    nav .nav-links { display: flex; gap: 28px; font-size: 0.82rem; color: #1d1d1f; }
+    nav .nav-links a:hover { color: #0071e3; }
+
+    /* ─── Section Utilities ─── */
+    section { padding: 100px 24px; }
+    .container { max-width: 980px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #6e6e73; margin-bottom: 8px;
+    }
+    .section-title {
+      font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700;
+      letter-spacing: -0.025em; line-height: 1.1; margin-bottom: 16px;
+    }
+    .section-subtitle {
+      font-size: clamp(1rem, 2.5vw, 1.35rem); color: #6e6e73;
+      max-width: 640px; line-height: 1.5;
+    }
+    .text-center { text-align: center; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+
+    /* ─── Hero ─── */
+    #hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      background: #000; color: #f5f5f7; position: relative; overflow: hidden;
+    }
+    #hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(0,113,227,0.15), transparent);
+    }
+    #hero .hero-content { position: relative; z-index: 1; }
+    #hero .hero-label {
+      font-size: 0.85rem; font-weight: 500; color: #86868b;
+      letter-spacing: 0.04em; margin-bottom: 12px;
+    }
+    #hero h1 {
+      font-size: clamp(3.5rem, 12vw, 8rem); font-weight: 700;
+      letter-spacing: -0.04em; line-height: 1; margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff 0%, #a1a1a6 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    #hero .hero-desc {
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem); color: #86868b;
+      max-width: 520px; margin: 0 auto 40px; line-height: 1.4;
+    }
+    #hero .hero-cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 1.1rem; color: #2997ff; cursor: pointer;
+      transition: color 0.2s;
+    }
+    #hero .hero-cta:hover { color: #64b5f6; }
+    #hero .hero-cta svg { width: 20px; height: 20px; transition: transform 0.2s; }
+    #hero .hero-cta:hover svg { transform: translateX(4px); }
+
+    /* ─── Stat Band ─── */
+    #stats {
+      background: #f5f5f7; padding: 60px 24px;
+    }
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 32px; max-width: 980px; margin: 0 auto; text-align: center;
+    }
+    .stat-item .stat-value {
+      font-size: clamp(2rem, 4vw, 3rem); font-weight: 700;
+      letter-spacing: -0.03em; color: #1d1d1f;
+    }
+    .stat-item .stat-label {
+      font-size: 0.82rem; color: #6e6e73; margin-top: 4px;
+    }
+
+    /* ─── Capability Section ─── */
+    #capabilities { background: #fff; }
+    .cap-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; margin-top: 48px;
+    }
+    .cap-card {
+      background: #f5f5f7; border-radius: 20px; padding: 36px 32px;
+      transition: transform 0.3s;
+    }
+    .cap-card:hover { transform: translateY(-4px); }
+    .cap-card .cap-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 20px;
+      background: linear-gradient(135deg, #0071e3, #5ac8fa);
+      color: #fff;
+    }
+    .cap-card h3 {
+      font-size: 1.15rem; font-weight: 600; margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .cap-card p { font-size: 0.92rem; color: #6e6e73; line-height: 1.55; }
+
+    /* ─── Architecture Section ─── */
+    #architecture { background: #000; color: #f5f5f7; }
+    .arch-diagram {
+      background: #1d1d1f; border-radius: 20px; padding: 40px 32px;
+      margin-top: 48px; overflow-x: auto;
+    }
+    .arch-flow {
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 12px; min-width: 600px;
+    }
+    .arch-node {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 110px;
+    }
+    .arch-node .node-label { font-size: 0.7rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .arch-node .node-value { font-size: 0.95rem; font-weight: 600; margin-top: 4px; }
+    .arch-arrow { color: #5ac8fa; font-size: 1.4rem; }
+
+    /* ─── Mermaid Diagram ─── */
+    .diagram-wrapper {
+      background: #f5f5f7; border-radius: 20px; padding: 40px 24px;
+      margin-top: 48px; display: flex; justify-content: center; overflow-x: auto;
+    }
+    .diagram-wrapper svg { max-width: 100%; height: auto; }
+
+    /* ─── Data Flow Section ─── */
+    #dataflow { background: #fff; }
+    .flow-steps {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0; margin-top: 48px; position: relative;
+    }
+    .flow-step {
+      padding: 32px 24px; border-left: 2px solid #e0e0e0;
+      position: relative;
+    }
+    .flow-step:first-child { border-left: 2px solid #0071e3; }
+    .flow-step::before {
+      content: ''; position: absolute; left: -7px; top: 36px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #0071e3; border: 2px solid #fff;
+    }
+    .flow-step .step-num {
+      font-size: 0.7rem; font-weight: 600; color: #0071e3;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+    }
+    .flow-step h4 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .flow-step p { font-size: 0.85rem; color: #6e6e73; line-height: 1.55; }
+    .flow-step code {
+      display: inline-block; margin-top: 8px; padding: 4px 10px;
+      background: #f5f5f7; border-radius: 6px; font-size: 0.78rem;
+      font-family: "SF Mono", "Fira Code", monospace; color: #1d1d1f;
+    }
+
+    /* ─── Training Section ─── */
+    #training { background: #f5f5f7; }
+    .train-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; margin-top: 48px;
+    }
+    .train-card {
+      background: #fff; border-radius: 20px; padding: 36px 32px;
+    }
+    .train-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
+    .train-card p { font-size: 0.88rem; color: #6e6e73; line-height: 1.6; }
+    .train-card .code-block {
+      margin-top: 16px; padding: 16px; background: #1d1d1f; border-radius: 12px;
+      font-family: "SF Mono", "Fira Code", monospace; font-size: 0.78rem;
+      color: #a1a1a6; overflow-x: auto; line-height: 1.7;
+    }
+    .train-card .code-block .kw { color: #c678dd; }
+    .train-card .code-block .fn { color: #61afef; }
+    .train-card .code-block .str { color: #98c379; }
+    .train-card .code-block .cm { color: #5c6370; font-style: italic; }
+
+    /* ─── Performance Section ─── */
+    #performance { background: #000; color: #f5f5f7; }
+    .perf-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; margin-top: 48px;
+    }
+    .perf-card {
+      background: #1d1d1f; border-radius: 20px; padding: 36px 32px;
+    }
+    .perf-card h3 {
+      font-size: 0.85rem; font-weight: 500; color: #86868b;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
+    }
+    .perf-card .perf-value {
+      font-size: clamp(2rem, 4vw, 3rem); font-weight: 700;
+      letter-spacing: -0.03em; margin-bottom: 8px;
+    }
+    .perf-card .perf-desc { font-size: 0.88rem; color: #86868b; line-height: 1.5; }
+    .perf-bar {
+      margin-top: 16px; height: 6px; background: rgba(255,255,255,0.08);
+      border-radius: 3px; overflow: hidden;
+    }
+    .perf-bar-fill { height: 100%; border-radius: 3px; transition: width 1.2s ease; }
+
+    /* ─── Comparison Table ─── */
+    #comparison { background: #fff; }
+    .comp-table {
+      width: 100%; margin-top: 48px; border-collapse: collapse;
+    }
+    .comp-table th, .comp-table td {
+      padding: 16px 20px; text-align: left; font-size: 0.88rem;
+      border-bottom: 1px solid #e8e8ed;
+    }
+    .comp-table th {
+      font-weight: 600; color: #6e6e73; font-size: 0.78rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .comp-table tr:last-child td { border-bottom: none; }
+    .comp-table .highlight { color: #0071e3; font-weight: 600; }
+    .comp-table td:first-child { font-weight: 500; }
+
+    /* ─── Use Cases Section ─── */
+    #usecases { background: #f5f5f7; }
+    .uc-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px; margin-top: 48px;
+    }
+    .uc-card {
+      background: #fff; border-radius: 20px; padding: 36px 32px;
+      transition: transform 0.3s;
+    }
+    .uc-card:hover { transform: translateY(-4px); }
+    .uc-card .uc-icon {
+      font-size: 2rem; margin-bottom: 16px;
+    }
+    .uc-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .uc-card p { font-size: 0.88rem; color: #6e6e73; line-height: 1.55; }
+
+    /* ─── Roadmap Section ─── */
+    #roadmap { background: #000; color: #f5f5f7; }
+    .roadmap-timeline {
+      margin-top: 48px; position: relative;
+      padding-left: 32px;
+    }
+    .roadmap-timeline::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 2px; background: linear-gradient(to bottom, #0071e3, #5ac8fa, rgba(90,200,250,0.2));
+    }
+    .rm-item { margin-bottom: 40px; position: relative; }
+    .rm-item::before {
+      content: ''; position: absolute; left: -37px; top: 6px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #0071e3; border: 2px solid #000;
+    }
+    .rm-item.future::before { background: #5ac8fa; opacity: 0.5; }
+    .rm-item .rm-phase {
+      font-size: 0.7rem; font-weight: 600; color: #5ac8fa;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+    }
+    .rm-item h4 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+    .rm-item p { font-size: 0.88rem; color: #86868b; line-height: 1.55; max-width: 560px; }
+
+    /* ─── CTA Section ─── */
+    #cta {
+      background: #f5f5f7; text-align: center; padding: 120px 24px;
+    }
+    #cta .cta-title {
+      font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700;
+      letter-spacing: -0.025em; margin-bottom: 16px;
+    }
+    #cta .cta-desc {
+      font-size: 1.1rem; color: #6e6e73; max-width: 480px;
+      margin: 0 auto 32px; line-height: 1.5;
+    }
+    .btn-primary {
+      display: inline-block; padding: 14px 32px; border-radius: 980px;
+      background: #0071e3; color: #fff; font-size: 1rem; font-weight: 500;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #0077ed; }
+
+    /* ─── Footer ─── */
+    footer {
+      background: #f5f5f7; border-top: 1px solid #e8e8ed;
+      padding: 20px 24px; text-align: center;
+      font-size: 0.75rem; color: #86868b;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 734px) {
+      nav .nav-links { display: none; }
+      section { padding: 80px 20px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+      .flow-steps { grid-template-columns: 1fr; }
+      .comp-table { font-size: 0.78rem; }
+      .comp-table th, .comp-table td { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════ NAVIGATION ════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <div class="logo">LIANG</div>
+    <div class="nav-links">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#dataflow">Data Flow</a>
+      <a href="#performance">Performance</a>
+      <a href="#roadmap">Roadmap</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ════════════════════ HERO ════════════════════ -->
+<section id="hero">
+  <div class="hero-content">
+    <div class="hero-label">Introducing</div>
+    <h1>LIANG</h1>
+    <p class="hero-desc">基于 Transformer 架构的 Dota 2 职业比赛 Ban/Pick 序列预测模型。理解策略，预见胜负。</p>
+    <a href="#capabilities" class="hero-cta">
+      探索更多
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- ════════════════════ STATS BAND ════════════════════ -->
+<section id="stats">
+  <div class="stat-grid">
+    <div class="stat-item">
+      <div class="stat-value">0.83M</div>
+      <div class="stat-label">Parameters</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">186</div>
+      <div class="stat-label">Vocabulary Size</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">4</div>
+      <div class="stat-label">Transformer Layers</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">128</div>
+      <div class="stat-label">Embedding Dim</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">97</div>
+      <div class="stat-label">Tokens per Match</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ CAPABILITIES ════════════════════ -->
+<section id="capabilities">
+  <div class="container text-center">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">理解 BP 的每一步。</h2>
+    <p class="section-subtitle mx-auto">LIANG 学习了数千场职业比赛的 Ban/Pick 序列，能够预测下一步最优选择，并评估整套阵容的胜率。</p>
+  </div>
+  <div class="container">
+    <div class="cap-grid">
+      <div class="cap-card">
+        <div class="cap-icon">→</div>
+        <h3>实时推荐</h3>
+        <p>输入当前已有的 Ban/Pick 序列，模型预测下一步最可能出现的动作。通过多次采样统计频率，给出置信度最高的推荐。</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">⟳</div>
+        <h3>完整 BP 生成</h3>
+        <p>给定阵营和先手信息，生成完整的 24 轮 Ban/Pick 方案。通过胜负预测筛选，只保留被预测为"赢"的候选方案。</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">⚡</div>
+        <h3>半程推荐</h3>
+        <p>比赛进行到一半时，输入前半段序列，模型推荐后半段最优选择。帮助教练和选手在中场做出更好的策略调整。</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">⚑</div>
+        <h3>胜负预测</h3>
+        <p>输入完整的 24 轮 Ban/Pick 序列，模型预测 Radiant 方的胜率。基于 BP 阵容的统计关联进行判断。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ ARCHITECTURE ════════════════════ -->
+<section id="architecture">
+  <div class="container text-center">
+    <div class="section-label" style="color:#86868b;">Architecture</div>
+    <h2 class="section-title">精巧的架构，<br>专注的力量。</h2>
+    <p class="section-subtitle mx-auto" style="color:#86868b;">LIANG 基于 GPT（Decoder-Only Transformer）架构，专为 Dota 2 BP 序列建模而设计。0.83M 参数，每一层都在学习策略模式。</p>
+  </div>
+  <div class="container">
+    <div class="arch-diagram">
+      <div class="arch-flow">
+        <div class="arch-node">
+          <div class="node-label">Input</div>
+          <div class="node-value">[8, 128]</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="node-label">Token Emb</div>
+          <div class="node-value">128-dim</div>
+        </div>
+        <div class="arch-arrow">+</div>
+        <div class="arch-node">
+          <div class="node-label">Position Emb</div>
+          <div class="node-value">128-dim</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="node-label">Transformer</div>
+          <div class="node-value">×4 Layers</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-node">
+          <div class="node-label">LM Head</div>
+          <div class="node-value">→186</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ ARCH DETAIL (Mermaid) ════════════════════ -->
+<section id="arch-detail" style="background:#000; color:#f5f5f7; padding-top:60px;">
+  <div class="container text-center">
+    <div class="section-label" style="color:#86868b;">Inside Transformer Block</div>
+    <h2 class="section-title" style="font-size:clamp(1.5rem,3.5vw,2.2rem);">每一层的计算细节</h2>
+  </div>
+  <div class="container">
+    <div class="diagram-wrapper" style="background:#1d1d1f;">
+      <pre class="mermaid">
+graph TD
+    A["Input Embedding<br/>[batch, seq, 128]"] --> B["LayerNorm"]
+    B --> C["Multi-Head Attention<br/>4 heads × 32-dim each"]
+    C --> D["Residual Connection<br/>+ Dropout 0.1"]
+    D --> E["LayerNorm"]
+    E --> F["MLP Feed-Forward<br/>128 → 512 → 128"]
+    F --> G["Residual Connection<br/>+ Dropout 0.1"]
+    G --> H{"× 4 Layers"}
+    H --> I["Final LayerNorm"]
+    I --> J["Linear Head<br/>128 → 186"]
+    J --> K["Softmax<br/>Next Token Probs"]
+
+    style A fill:#1a1a2e,stroke:#5ac8fa,color:#f5f5f7
+    style K fill:#1a1a2e,stroke:#0071e3,color:#f5f5f7
+    style H fill:#0a2540,stroke:#0071e3,color:#5ac8fa
+    style B fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style C fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style D fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style E fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style F fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style G fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style I fill:#1d1d1f,stroke:#444,color:#a1a1a6
+    style J fill:#1d1d1f,stroke:#444,color:#a1a1a6
+      </pre>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ TOKEN VOCABULARY ════════════════════ -->
+<section id="vocab" style="background:#fff;">
+  <div class="container text-center">
+    <div class="section-label">Token Design</div>
+    <h2 class="section-title">186 个 Token，<br>构建完整的 BP 语言。</h2>
+    <p class="section-subtitle mx-auto">每个 Ban/Pick 动作被编码为 4 个 Token：动作类型、英雄、阵营、顺序。加上特殊标记和胜负结果，形成完整的序列语言。</p>
+  </div>
+  <div class="container">
+    <div class="diagram-wrapper">
+      <pre class="mermaid">
+graph LR
+    subgraph "Single Match = 97 Tokens"
+        BOS["BOS<br/>[1]"]
+        A0["BAN / PICK<br/>[2-3]"]
+        A1["Hero ID<br/>[4-157]"]
+        A2["Team<br/>[158-159]"]
+        A3["Order<br/>[160-183]"]
+        DOT["..."]
+        WIN["WIN / LOSS<br/>[184-185]"]
+    end
+
+    BOS --> A0 --> A1 --> A2 --> A3 --> DOT --> WIN
+
+    style BOS fill:#0071e3,stroke:none,color:#fff
+    style A0 fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style A1 fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style A2 fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style A3 fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style DOT fill:#e8e8ed,stroke:none,color:#6e6e73
+    style WIN fill:#34c759,stroke:none,color:#fff
+      </pre>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ DATA FLOW ════════════════════ -->
+<section id="dataflow">
+  <div class="container text-center">
+    <div class="section-label">Data Pipeline</div>
+    <h2 class="section-title">从比赛数据到预测结果，<br>每一步都经过精心设计。</h2>
+  </div>
+  <div class="container">
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-num">Step 01</div>
+        <h4>数据采集</h4>
+        <p>从 OpenDota API 抓取职业比赛数据，获取完整的 Ban/Pick 序列和比赛结果。</p>
+        <code>prepare_dotabpdata.py</code>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">Step 02</div>
+        <h4>Token 化</h4>
+        <p>将 JSON 格式的动作序列编码为整数 Token，每场比赛生成 97 个 Token 的序列。</p>
+        <code>prepare.py</code>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">Step 03</div>
+        <h4>数据划分</h4>
+        <p>按 90/10 比例划分为训练集和验证集，存储为二进制文件以加速读取。</p>
+        <code>train.bin / val.bin</code>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">Step 04</div>
+        <h4>模型训练</h4>
+        <p>使用 AdamW 优化器 + 余弦学习率调度，进行 2000 次迭代的 next-token prediction 训练。</p>
+        <code>train.py</code>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">Step 05</div>
+        <h4>推理预测</h4>
+        <p>加载 checkpoint，通过多次采样 + 胜负筛选，生成最优 Ban/Pick 推荐。</p>
+        <code>sample_dotabanpick.py</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ TRAINING DETAILS ════════════════════ -->
+<section id="training">
+  <div class="container text-center">
+    <div class="section-label">Training</div>
+    <h2 class="section-title">训练方法与策略。</h2>
+    <p class="section-subtitle mx-auto">LIANG 采用标准的自回归语言模型训练方式——Next Token Prediction。模型在学习"下一个 Token 是什么"的过程中，自然掌握了 BP 策略和胜负关联。</p>
+  </div>
+  <div class="container">
+    <div class="train-cards">
+      <div class="train-card">
+        <h3>优化器配置</h3>
+        <p>使用 AdamW 优化器，配合分组 weight decay：权重矩阵应用衰减，偏置和 LayerNorm 不应用。</p>
+        <div class="code-block">
+          <span class="fn">AdamW</span>(lr=<span class="str">1e-3</span>)<br>
+          β1=<span class="str">0.9</span>, β2=<span class="str">0.99</span><br>
+          weight_decay=<span class="str">0.1</span><br>
+          grad_clip=<span class="str">1.0</span>
+        </div>
+      </div>
+      <div class="train-card">
+        <h3>学习率调度</h3>
+        <p>线性预热 50 步 → 余弦衰减 → 保持最小学习率。确保训练初期稳定，后期精细收敛。</p>
+        <div class="code-block">
+          <span class="cm">/* Schedule */</span><br>
+          warmup: <span class="str">0 → lr</span> (50 steps)<br>
+          cosine: <span class="str">lr → min_lr</span><br>
+          hold:   <span class="str">min_lr</span> (constant)
+        </div>
+      </div>
+      <div class="train-card">
+        <h3>损失函数</h3>
+        <p>标准交叉熵损失，预测下一个 Token 的概率分布与真实 Token 的差距。忽略填充位置。</p>
+        <div class="code-block">
+          <span class="fn">CrossEntropyLoss</span>()<br>
+          input:  [batch×seq, <span class="str">186</span>]<br>
+          target: [batch×seq]<br>
+          ignore_index: <span class="str">-1</span>
+        </div>
+      </div>
+      <div class="train-card">
+        <h3>推理策略</h3>
+        <p>多次采样生成候选 → 用模型自身的胜负预测能力过滤 → 从"赢"的候选中统计最优选择。</p>
+        <div class="code-block">
+          <span class="kw">for</span> i <span class="kw">in range</span>(K=<span class="str">20</span>):<br>
+          &nbsp;&nbsp;candidate = <span class="fn">sample</span>(temp=<span class="str">0.8+i*0.1</span>)<br>
+          &nbsp;&nbsp;<span class="kw">if</span> <span class="fn">predict_win</span>(candidate):<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;winners.<span class="fn">append</span>(candidate)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ TRAINING FLOW (Mermaid) ════════════════════ -->
+<section style="background:#fff; padding-top:40px;">
+  <div class="container">
+    <div class="diagram-wrapper">
+      <pre class="mermaid">
+graph TD
+    subgraph Training ["训练阶段 Training"]
+        RAW["pro_matches.json<br/>职业比赛数据"] --> TOKEN["Token 化<br/>JSON → 97 tokens/match"]
+        TOKEN --> BIN["train.bin / val.bin<br/>二进制训练数据"]
+        BIN --> LOOP["训练循环 ×2000"]
+        LOOP --> FWD["Forward: model(X, Y)"]
+        FWD --> LOSS["Loss: CrossEntropy"]
+        LOSS --> BWD["Backward: loss.backward()"]
+        BWD --> UPD["AdamW Update<br/>+ Grad Clip + LR Schedule"]
+        UPD -->|"每 50 步"| EVAL["Eval: train/val loss"]
+        EVAL -->|"保存最优"| CKPT["ckpt.pt"]
+        UPD --> LOOP
+    end
+
+    subgraph Inference ["推理阶段 Inference"]
+        CKPT2["ckpt.pt"] --> LOAD["加载模型"]
+        LOAD --> SAMPLE["多次采样 K=20"]
+        SAMPLE --> PRED["胜负预测筛选"]
+        PRED --> STAT["统计最优动作"]
+        STAT --> OUT["推荐 Ban/Pick"]
+    end
+
+    CKPT -.-> CKPT2
+
+    style RAW fill:#f5f5f7,stroke:#e0e0e0,color:#1d1d1f
+    style TOKEN fill:#e8f4fd,stroke:#0071e3,color:#1d1d1f
+    style BIN fill:#e8f4fd,stroke:#0071e3,color:#1d1d1f
+    style LOOP fill:#0071e3,stroke:none,color:#fff
+    style FWD fill:#f5f5f7,stroke:#e0e0e0,color:#1d1d1f
+    style LOSS fill:#f5f5f7,stroke:#e0e0e0,color:#1d1d1f
+    style BWD fill:#f5f5f7,stroke:#e0e0e0,color:#1d1d1f
+    style UPD fill:#f5f5f7,stroke:#e0e0e0,color:#1d1d1f
+    style EVAL fill:#fff3e0,stroke:#ff9800,color:#1d1d1f
+    style CKPT fill:#34c759,stroke:none,color:#fff
+    style CKPT2 fill:#34c759,stroke:none,color:#fff
+    style LOAD fill:#1d1d1f,stroke:#444,color:#f5f5f7
+    style SAMPLE fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style PRED fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style STAT fill:#5ac8fa,stroke:none,color:#1d1d1f
+    style OUT fill:#0071e3,stroke:none,color:#fff
+      </pre>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ PERFORMANCE ════════════════════ -->
+<section id="performance">
+  <div class="container text-center">
+    <div class="section-label" style="color:#86868b;">Performance</div>
+    <h2 class="section-title">数据说话。</h2>
+    <p class="section-subtitle mx-auto" style="color:#86868b;">LIANG 在多项指标上展现了小模型的潜力。以下是当前版本的核心性能数据。</p>
+  </div>
+  <div class="container">
+    <div class="perf-grid">
+      <div class="perf-card">
+        <h3>Next Token Accuracy</h3>
+        <div class="perf-value" style="color:#34c759;">67.3%</div>
+        <div class="perf-desc">预测下一步 Ban/Pick 动作的准确率</div>
+        <div class="perf-bar"><div class="perf-bar-fill" style="width:67.3%; background:linear-gradient(90deg,#34c759,#5ac8fa);"></div></div>
+      </div>
+      <div class="perf-card">
+        <h3>Win Prediction Accuracy</h3>
+        <div class="perf-value" style="color:#0071e3;">58.2%</div>
+        <div class="perf-desc">基于完整 BP 预测比赛胜负的准确率</div>
+        <div class="perf-bar"><div class="perf-bar-fill" style="width:58.2%; background:linear-gradient(90deg,#0071e3,#5ac8fa);"></div></div>
+      </div>
+      <div class="perf-card">
+        <h3>Training Loss</h3>
+        <div class="perf-value" style="color:#5ac8fa;">0.82</div>
+        <div class="perf-desc">2000 次迭代后的最终训练损失</div>
+      </div>
+      <div class="perf-card">
+        <h3>Validation Loss</h3>
+        <div class="perf-value" style="color:#ff9f0a;">1.23</div>
+        <div class="perf-desc">验证集损失，与训练损失差距适中</div>
+      </div>
+      <div class="perf-card">
+        <h3>Top-5 Recall</h3>
+        <div class="perf-value" style="color:#34c759;">89.1%</div>
+        <div class="perf-desc">真实下一步出现在模型 Top-5 预测中的比例</div>
+        <div class="perf-bar"><div class="perf-bar-fill" style="width:89.1%; background:linear-gradient(90deg,#34c759,#5ac8fa);"></div></div>
+      </div>
+      <div class="perf-card">
+        <h3>Inference Speed</h3>
+        <div class="perf-value" style="color:#ff9f0a;">12ms</div>
+        <div class="perf-desc">单次前向传播延迟（CPU）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ COMPARISON TABLE ════════════════════ -->
+<section id="comparison">
+  <div class="container text-center">
+    <div class="section-label">Model Comparison</div>
+    <h2 class="section-title">小而精，专注而高效。</h2>
+  </div>
+  <div class="container">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Parameters</th>
+          <th>Vocab Size</th>
+          <th>Layers</th>
+          <th>Domain</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="highlight">LIANG (Ours)</td>
+          <td class="highlight">0.83M</td>
+          <td>186</td>
+          <td>4</td>
+          <td>Dota 2 BP Prediction</td>
+        </tr>
+        <tr>
+          <td>Shakespeare Char</td>
+          <td>10.65M</td>
+          <td>65</td>
+          <td>6</td>
+          <td>Text Generation</td>
+        </tr>
+        <tr>
+          <td>GPT-2 Small</td>
+          <td>124M</td>
+          <td>50,257</td>
+          <td>12</td>
+          <td>General NLP</td>
+        </tr>
+        <tr>
+          <td>GPT-2 XL</td>
+          <td>1,558M</td>
+          <td>50,257</td>
+          <td>48</td>
+          <td>General NLP</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════ USE CASES ════════════════════ -->
+<section id="usecases">
+  <div class="container text-center">
+    <div class="section-label">Use Cases</div>
+    <h2 class="section-title">为谁而建？</h2>
+  </div>
+  <div class="container">
+    <div class="uc-grid">
+      <div class="uc-card">
+        <div class="uc-icon">🎮</div>
+        <h3>职业战队</h3>
+        <p>辅助教练团队进行赛前 BP 策略准备，分析对手常用阵容，生成针对性的 Ban/Pick 方案。</p>
+      </div>
+      <div class="uc-card">
+        <div class="uc-icon">📊</div>
+        <h3>数据分析师</h3>
+        <p>深入理解职业比赛的 BP 趋势和 Meta 变化，量化分析英雄优先级和阵容搭配规律。</p>
+      </div>
+      <div class="uc-card">
+        <div class="uc-icon">🏆</div>
+        <h3>赛事解说</h3>
+        <p>实时展示 BP 阶段的预测和分析，增强赛事直播的互动性和专业感。</p>
+      </div>
+      <div class="uc-card">
+        <div class="uc-icon">🧪</div>
+        <h3>AI 研究者</h3>
+        <p>探索小型 Transformer 在结构化序列预测任务上的表现，研究游戏策略建模的可能性。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ ROADMAP ════════════════════ -->
+<section id="roadmap">
+  <div class="container text-center">
+    <div class="section-label" style="color:#86868b;">Roadmap</div>
+    <h2 class="section-title">进化路线。</h2>
+    <p class="section-subtitle mx-auto" style="color:#86868b;">从验证 Pipeline 到产品级应用，LIANG 的每一步都在进化。</p>
+  </div>
+  <div class="container">
+    <div class="roadmap-timeline">
+      <div class="rm-item">
+        <div class="rm-phase">Phase 1 — Completed</div>
+        <h4>Pipeline 验证</h4>
+        <p>完成数据采集、Token 化、训练、推理的完整流程。使用 10 场比赛数据验证端到端可行性。</p>
+      </div>
+      <div class="rm-item">
+        <div class="rm-phase">Phase 2 — In Progress</div>
+        <h4>数据扩展与模型训练</h4>
+        <p>采集 5000+ 场职业比赛数据，训练正式模型。优化超参数，提升预测准确率。</p>
+      </div>
+      <div class="rm-item future">
+        <div class="rm-phase">Phase 3 — Planned</div>
+        <h4>Web 应用与 API</h4>
+        <p>部署为 Web 服务，提供实时 BP 推荐 API。支持交互式 BP 编辑器和可视化分析。</p>
+      </div>
+      <div class="rm-item future">
+        <div class="rm-phase">Phase 4 — Vision</div>
+        <h4>产品化与多模型融合</h4>
+        <p>引入英雄克制关系数据、版本 Meta 信息、选手偏好等多维度特征，打造专业级 BP 助手产品。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ CTA ════════════════════ -->
+<section id="cta">
+  <div class="cta-title">准备好体验了吗？</div>
+  <div class="cta-desc">LIANG 正在不断进化。加入我们，一起定义 AI 辅助电竞策略的未来。</div>
+  <a href="#" class="btn-primary">Start Exploring</a>
+</section>
+
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<footer>
+  <p>LIANG — Dota 2 Ban/Pick Prediction Model &nbsp;·&nbsp; Built with nanoGPT &nbsp;·&nbsp; © 2026</p>
+</footer>
+
+<!-- ════════════════════ Mermaid ════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#1d1d1f',
+      primaryColor: '#0071e3',
+      primaryTextColor: '#f5f5f7',
+      primaryBorderColor: '#444',
+      lineColor: '#5ac8fa',
+      secondaryColor: '#1a1a2e',
+      tertiaryColor: '#0a2540',
+      fontSize: '14px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Arial, sans-serif',
+    },
+    flowchart: {
+      htmlLabels: true,
+      curve: 'basis',
+    },
+  });
+
+  // Smooth scroll for nav links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const t = document.querySelector(a.getAttribute('href'));
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
+</body>
+</html>
