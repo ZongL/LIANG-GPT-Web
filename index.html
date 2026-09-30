@@ -296,12 +296,21 @@
       font-size: 1.1rem; color: #6e6e73; max-width: 480px;
       margin: 0 auto 32px; line-height: 1.5;
     }
+    .cta-buttons {
+      display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    }
     .btn-primary {
       display: inline-block; padding: 14px 32px; border-radius: 980px;
       background: #0071e3; color: #fff; font-size: 1rem; font-weight: 500;
       transition: background 0.2s;
     }
     .btn-primary:hover { background: #0077ed; }
+    .btn-secondary {
+      display: inline-block; padding: 14px 32px; border-radius: 980px;
+      background: #fff; color: #0071e3; font-size: 1rem; font-weight: 500;
+      border: 2px solid #0071e3; transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: #0071e3; color: #fff; }
 
     /* ─── Footer ─── */
     footer {
@@ -318,6 +327,7 @@
       .flow-steps { grid-template-columns: 1fr; }
       .comp-table { font-size: 0.78rem; }
       .comp-table th, .comp-table td { padding: 10px 12px; }
+      .cta-buttons { flex-direction: column; align-items: center; }
     }
   </style>
 </head>
@@ -345,7 +355,7 @@
     <p class="hero-desc">基于 Transformer 架构的 Dota 2 职业比赛 Ban/Pick 序列预测模型。理解策略，预见胜负。</p>
     <a href="#capabilities" class="hero-cta">
       探索更多
-      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4[...]
     </a>
   </div>
 </section>
@@ -414,7 +424,7 @@
   <div class="container text-center">
     <div class="section-label" style="color:#86868b;">Architecture</div>
     <h2 class="section-title">精巧的架构，<br>专注的力量。</h2>
-    <p class="section-subtitle mx-auto" style="color:#86868b;">LIANG 基于 GPT（Decoder-Only Transformer）架构，专为 Dota 2 BP 序列建模而设计。0.83M 参数，每一层都在学习策略模式。</p>
+    <p class="section-subtitle mx-auto" style="color:#86868b;">LIANG 基于 GPT（Decoder-Only Transformer）架构，专为 Dota 2 BP 序列建模而设计。0.83M 参数，每一层都在学习策[...]
   </div>
   <div class="container">
     <div class="arch-diagram">
@@ -490,7 +500,7 @@ graph TD
   <div class="container text-center">
     <div class="section-label">Token Design</div>
     <h2 class="section-title">186 个 Token，<br>构建完整的 BP 语言。</h2>
-    <p class="section-subtitle mx-auto">每个 Ban/Pick 动作被编码为 4 个 Token：动作类型、英雄、阵营、顺序。加上特殊标记和胜负结果，形成完整的序列语言。</p>
+    <p class="section-subtitle mx-auto">每个 Ban/Pick 动作被编码为 4 个 Token：动作类型、英雄、阵营、顺序。加上特殊标记和胜负结果，形成完整的序列语言[...]
   </div>
   <div class="container">
     <div class="diagram-wrapper">
@@ -567,7 +577,7 @@ graph LR
   <div class="container text-center">
     <div class="section-label">Training</div>
     <h2 class="section-title">训练方法与策略。</h2>
-    <p class="section-subtitle mx-auto">LIANG 采用标准的自回归语言模型训练方式——Next Token Prediction。模型在学习"下一个 Token 是什么"的过程中，自然掌握了 BP 策略和胜负关联。</p>
+    <p class="section-subtitle mx-auto">LIANG 采用标准的自回归语言模型训练方式——Next Token Prediction。模型在学习"下一个 Token 是什么"的过程中，自然掌握[...]
   </div>
   <div class="container">
     <div class="train-cards">
@@ -831,7 +841,10 @@ graph TD
 <section id="cta">
   <div class="cta-title">准备好体验了吗？</div>
   <div class="cta-desc">LIANG 正在不断进化。加入我们，一起定义 AI 辅助电竞策略的未来。</div>
-  <a href="#" class="btn-primary">Start Exploring</a>
+  <div class="cta-buttons">
+    <a href="https://huggingface.co/spaces/andy888888888/deepdota" target="_blank" class="btn-primary">Try on Hugging Face</a>
+    <a href="#" class="btn-secondary">Learn More</a>
+  </div>
 </section>
 
 <!-- ════════════════════ FOOTER ════════════════════ -->
